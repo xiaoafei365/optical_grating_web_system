@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G45-L-P1X光栅测量系统 - Web版</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+        }
+        
+        /* 标题栏样式 - 与原程序一致 */
+        .title-bar {
+            background-color: #2c3e50;
+            color: white;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+        
+        .title-text {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .time-display {
+            font-size: 12px;
+            color: #ecf0f1;
+        }
+        
+        /* 控制面板样式 */
+        .control-panel {
+            background-color: #ecf0f1;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            gap: 10px;
+        }
+        
+        .control-btn {
+            padding: 10px 20px;
+            font-size: 12px;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            min-width: 120px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .control-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .start-btn {
+            background-color: #27ae60;
+            color: white;
+        }
+        
+        .stop-btn {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        .export-btn {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .config-btn {
+            background-color: #9b59b6;
+            color: white;
+        }
+        
+        .system-status {
+            margin-left: auto;
+            font-size: 12px;
+            font-weight: bold;
+            color: #27ae60;
+        }
+        
+        /* 选择面板样式 */
+        .selection-panel {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            margin: 5px 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .panel-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .version-selector {
+            padding: 10px;
+        }
+
+        .version-dropdown {
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+            cursor: pointer;
+        }
+
+        .version-dropdown:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .selection-row {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .version-section {
+            flex: 0 0 200px;
+        }
+
+        .grating-section {
+            flex: 1;
+        }
+
+        .selection-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .selection-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 8px 12px;
+            margin: 2px;
+            font-size: 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+            cursor: pointer;
+            transition: all 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .selection-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            border-color: #3498db;
+        }
+
+        .selection-btn:active {
+            transform: scale(0.98);
+        }
+
+        .selection-btn.active {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .selection-btn.active:hover {
+            background-color: #2980b9;
+        }
+        
+        /* 状态信息面板 */
+        .status-panel {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            margin: 5px 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .cpk-display {
+            font-size: 14px;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+        
+        .current-value, .spec-limits, .database-status {
+            font-size: 12px;
+        }
+
+        .database-status {
+            font-weight: bold;
+            margin-left: auto;
+        }
+
+        /* CPK面板样式 */
+        .cpk-panel {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            margin: 5px 10px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .cpk-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .cpk-item {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .cpk-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .cpk-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .cpk-value {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .cpk-status {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .cpk-excellent { color: #27ae60; }
+        .cpk-good { color: #f39c12; }
+        .cpk-poor { color: #e74c3c; }
+
+        .status-excellent { background-color: #d5f4e6; color: #27ae60; }
+        .status-good { background-color: #fef9e7; color: #f39c12; }
+        .status-poor { background-color: #fadbd8; color: #e74c3c; }
+        
+        /* 图表区域 */
+        .chart-area {
+            padding: 10px;
+            background-color: white;
+            margin: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            min-height: 600px;
+        }
+        
+        .chart-container {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            height: 280px;
+            position: relative;
+        }
+        
+        /* 底部状态栏 */
+        .status-bar {
+            background-color: #34495e;
+            color: white;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 12px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+        
+        .connection-status {
+            margin-left: auto;
+        }
+        
+        /* 报警样式 */
+        .alarm-message {
+            background-color: #e74c3c;
+            color: white;
+            padding: 10px;
+            margin: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 标题栏 - 与原程序布局完全一致 -->
+    <div class="title-bar">
+        <div class="title-text">G45-L-P1X光栅测量系统 - Web版</div>
+        <div class="time-display" id="timeDisplay"></div>
+    </div>
+    
+    <!-- 控制面板 -->
+    <div class="control-panel">
+        <button class="control-btn start-btn" id="startBtn">开始测量</button>
+        <button class="control-btn stop-btn" id="stopBtn" disabled>停止测量</button>
+        <button class="control-btn export-btn" id="exportBtn">导出数据</button>
+        <button class="control-btn config-btn" id="configBtn">参数设置</button>
+        <div class="system-status" id="systemStatus">系统就绪</div>
+    </div>
+    
+    <!-- 版本和磁栅尺选择面板 -->
+    <div class="selection-panel">
+        <div class="selection-row">
+            <!-- 版本选择 -->
+            <div class="version-section">
+                <div class="panel-title">版本选择</div>
+                <select id="versionSelect" class="version-dropdown">
+                    <!-- 版本选项将动态加载 -->
+                </select>
+            </div>
+            
+            <!-- 磁栅尺选择 -->
+            <div class="grating-section">
+                <div class="panel-title">磁栅尺选择</div>
+                <div class="selection-buttons" id="gratingButtons">
+                    <!-- 按钮将根据版本动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 状态信息面板 -->
+    <div class="status-panel">
+        <div class="cpk-display" id="cpkDisplay">CPK: --</div>
+        <div class="current-value" id="currentValue">当前值: --</div>
+        <div class="spec-limits" id="specLimits">规格限: --</div>
+        <button class="control-btn cpk-btn" id="cpkBtn" style="background-color: #8e44ad; color: white; margin-left: 20px;">CPK趋势</button>
+        <div class="database-status" id="databaseStatus">数据库: 检查中...</div>
+        <div class="connection-details" id="connectionDetails">连接状态: 初始化中...</div>
+    </div>
+
+    <!-- CPK详细面板 (默认隐藏) -->
+    <div class="cpk-panel" id="cpkPanel" style="display: none;">
+        <div class="panel-title">CPK能力指数监控 - <span id="cpkSideIndicator">L侧</span></div>
+        <div class="cpk-grid">
+            <div class="cpk-item">
+                <div class="cpk-label" id="labelP1">L-P1</div>
+                <div class="cpk-value" id="cpkP1">--</div>
+                <div class="cpk-status" id="statusP1">--</div>
+            </div>
+            <div class="cpk-item">
+                <div class="cpk-label" id="labelP5U">L-P5U</div>
+                <div class="cpk-value" id="cpkP5U">--</div>
+                <div class="cpk-status" id="statusP5U">--</div>
+            </div>
+            <div class="cpk-item">
+                <div class="cpk-label" id="labelP5L">L-P5L</div>
+                <div class="cpk-value" id="cpkP5L">--</div>
+                <div class="cpk-status" id="statusP5L">--</div>
+            </div>
+            <div class="cpk-item">
+                <div class="cpk-label" id="labelP3">L-P3</div>
+                <div class="cpk-value" id="cpkP3">--</div>
+                <div class="cpk-status" id="statusP3">--</div>
+            </div>
+            <div class="cpk-item">
+                <div class="cpk-label" id="labelP4">L-P4</div>
+                <div class="cpk-value" id="cpkP4">--</div>
+                <div class="cpk-status" id="statusP4">--</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 报警区域 -->
+    <div id="alarmArea"></div>
+    
+    <!-- 图表区域 -->
+    <div class="chart-area" id="chartArea">
+        <!-- 图表将动态生成 -->
+    </div>
+    
+    <!-- 底部状态栏 -->
+    <div class="status-bar">
+        <span id="statusText">系统就绪</span>
+        <span class="connection-status" id="connectionStatus">未连接</span>
+    </div>
+
+    <script>
+        // 全局变量
+        let socket = null;
+        let charts = {};
+        let currentGrating = '';
+        let currentVersion = 'G45';
+        let isRunning = false;
+
+        // 磁栅尺参数映射
+        const gratingParams = {
+            'G45_Channel_1_L': ['x1', 'x2', 't'],
+            'G45_Channel_2_L': ['m13m9', 'p3lt'],
+            'G45_Channel_3_L': ['p3ut'],
+            'G45_Channel_4_L': ['m6m8', 'p5t'],
+            'G45_Channel_5_L': ['p4'],
+            'G45_Channel_1_R': ['x1', 'x2', 't'],
+            'G45_Channel_2_R': ['m13m9', 'p3lt'],
+            'G45_Channel_3_R': ['p3ut'],
+            'G45_Channel_4_R': ['m6m8', 'p5t'],
+            'G45_Channel_5_R': ['p4'],
+            'G48_Channel_1_L': ['x1', 'x2', 't'],
+            'G48_Channel_2_L': ['m13m9', 'p3lt'],
+            'G48_Channel_3_L': ['p3ut'],
+            'G48_Channel_4_L': ['m6m8', 'p5t'],
+            'G48_Channel_5_L': ['p4'],
+            'G48_Channel_1_R': ['x1', 'x2', 't'],
+            'G48_Channel_2_R': ['m13m9', 'p3lt'],
+            'G48_Channel_3_R': ['p3ut'],
+            'G48_Channel_4_R': ['m6m8', 'p5t'],
+            'G48_Channel_5_R': ['p4']
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSocket();
+            initializeEventListeners();
+            loadVersions();
+            checkDatabaseStatus();
+
+            updateTimeDisplay();
+            setInterval(updateTimeDisplay, 1000);
+
+            // 初始化数据源状态显示
+            updateDataSourceStatus();
+
+            // 定期检查数据库连接状态 (每30秒)
+            setInterval(checkDatabaseStatus, 30000);
+        });
+
+        // 检查数据库状态
+        function checkDatabaseStatus() {
+            const statusElement = document.getElementById('databaseStatus');
+            const detailsElement = document.getElementById('connectionDetails');
+
+            fetch('/api/get_database_info')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        if (data.database_available) {
+                            statusElement.textContent = `数据库: 已连接 (${data.table_count}个表)`;
+                            statusElement.style.color = '#27ae60';
+
+                            // 显示详细连接信息
+                            const g45Tables = data.tables.filter(t => t.includes('G45')).length;
+                            const g48Tables = data.tables.filter(t => t.includes('G48')).length;
+                            detailsElement.textContent = `G45表: ${g45Tables}个 | G48表: ${g48Tables}个 | 数据源: 实时数据库`;
+                            detailsElement.style.color = '#27ae60';
+
+                            console.log('数据库可用，表列表:', data.tables);
+                        } else {
+                            statusElement.textContent = '数据库: 不可用';
+                            statusElement.style.color = '#f39c12';
+                            detailsElement.textContent = '连接状态: 使用模拟数据 | 数据源: 算法生成';
+                            detailsElement.style.color = '#f39c12';
+                        }
+                    } else {
+                        statusElement.textContent = '数据库: 连接失败';
+                        statusElement.style.color = '#e74c3c';
+                        detailsElement.textContent = `连接状态: 错误 - ${data.message || '未知错误'}`;
+                        detailsElement.style.color = '#e74c3c';
+                    }
+                })
+                .catch(error => {
+                    console.error('检查数据库状态失败:', error);
+                    statusElement.textContent = '数据库: 检查失败';
+                    statusElement.style.color = '#e74c3c';
+                    detailsElement.textContent = `连接状态: 网络错误 - ${error.message}`;
+                    detailsElement.style.color = '#e74c3c';
+                });
+        }
+
+        // 加载版本信息
+        function loadVersions() {
+            fetch('/api/get_versions')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const versionSelect = document.getElementById('versionSelect');
+                        versionSelect.innerHTML = '';
+                        
+                        data.versions.forEach(version => {
+                            const option = document.createElement('option');
+                            option.value = version;
+                            option.textContent = version;
+                            option.selected = version === data.current_version;
+                            versionSelect.appendChild(option);
+                        });
+                        
+                        currentVersion = data.current_version;
+                        
+                        // 立即更新页面标题
+                        updatePageTitle(currentVersion);
+                        
+                        // 生成按钮
+                        generateGratingButtons(currentVersion);
+                        
+                        // 设置默认选择
+                        const defaultGrating = `${currentVersion}_Channel_1_L`;
+                        selectGrating(defaultGrating);
+                        
+                        console.log(`初始版本加载: ${currentVersion}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('加载版本失败:', error);
+                    // 使用默认版本
+                    currentVersion = 'G45';
+                    updatePageTitle(currentVersion);
+                    generateGratingButtons(currentVersion);
+                    selectGrating('G45_Channel_1_L');
+                });
+        }
+
+        // 生成磁栅尺选择按钮
+        function generateGratingButtons(version) {
+            const gratingButtons = document.getElementById('gratingButtons');
+            gratingButtons.innerHTML = '';
+            
+            // 左侧按钮 (L)
+            const leftButtons = [
+                { channel: 1, name: 'P1' },
+                { channel: 2, name: 'P5L' },
+                { channel: 3, name: 'P5U' },
+                { channel: 4, name: 'P3' },
+                { channel: 5, name: 'P4' }
+            ];
+            
+            // 右侧按钮 (R)
+            const rightButtons = [
+                { channel: 1, name: 'P1' },
+                { channel: 2, name: 'P5L' },
+                { channel: 3, name: 'P5U' },
+                { channel: 4, name: 'P3' },
+                { channel: 5, name: 'P4' }
+            ];
+            
+            // 生成左侧按钮
+            leftButtons.forEach(btn => {
+                const button = document.createElement('button');
+                button.className = 'selection-btn';
+                button.dataset.grating = `${version}_Channel_${btn.channel}_L`;
+                button.textContent = `${version}-L-${btn.name}`;
+                gratingButtons.appendChild(button);
+            });
+
+            // 生成右侧按钮
+            rightButtons.forEach(btn => {
+                const button = document.createElement('button');
+                button.className = 'selection-btn';
+                button.dataset.grating = `${version}_Channel_${btn.channel}_R`;
+                button.textContent = `${version}-R-${btn.name}`;
+                gratingButtons.appendChild(button);
+            });
+        }
+
+        // 版本选择变化处理
+        function onVersionChange() {
+            const versionSelect = document.getElementById('versionSelect');
+            const selectedVersion = versionSelect.value;
+            
+            console.log(`版本切换: ${currentVersion} -> ${selectedVersion}`);
+            
+            // 保存版本选择到后端
+            fetch('/api/set_version', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ version: selectedVersion })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 更新全局变量
+                    currentVersion = selectedVersion;
+                    
+                    // 立即更新页面标题
+                    updatePageTitle(selectedVersion);
+                    
+                    // 重新生成磁栅尺按钮
+                    generateGratingButtons(selectedVersion);
+                    
+                    // 选择新版本的第一个通道
+                    const defaultGrating = `${selectedVersion}_Channel_1_L`;
+                    selectGrating(defaultGrating);
+
+                    // 如果CPK面板是打开的，更新CPK值
+                    const cpkPanel = document.getElementById('cpkPanel');
+                    if (cpkPanel && cpkPanel.style.display !== 'none') {
+                        console.log('版本切换时更新CPK值');
+                        setTimeout(() => {
+                            updateAllCPKValues();
+                        }, 500); // 延迟500ms确保数据加载完成
+                    }
+
+                    // 更新状态面板中的CPK显示
+                    setTimeout(() => {
+                        updateStatusCPK();
+                    }, 300);
+
+                    console.log(`版本已成功切换到: ${selectedVersion}`);
+                } else {
+                    console.error('保存版本失败:', data.message);
+                    // 恢复到原来的选择
+                    versionSelect.value = currentVersion;
+                }
+            })
+            .catch(error => {
+                console.error('保存版本失败:', error);
+                // 恢复到原来的选择
+                versionSelect.value = currentVersion;
+            });
+        }
+
+        // Socket.IO初始化
+        function initializeSocket() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                document.getElementById('connectionStatus').textContent = '已连接';
+                document.getElementById('connectionStatus').style.color = '#27ae60';
+            });
+            
+            socket.on('disconnect', function() {
+                document.getElementById('connectionStatus').textContent = '连接断开';
+                document.getElementById('connectionStatus').style.color = '#e74c3c';
+            });
+            
+            socket.on('measurement_update', function(data) {
+                if (data.channel === currentChannel) {
+                    updateChart();
+                    updateStatusDisplay(data.data);
+                }
+                updateStatusText(`通道${data.channel}数据更新 - ${new Date().toLocaleTimeString()}`);
+            });
+            
+            socket.on('alarm', function(data) {
+                showAlarm(data.message);
+            });
+        }
+        
+        // 事件监听器初始化
+        function initializeEventListeners() {
+            // 开始测量按钮
+            document.getElementById('startBtn').addEventListener('click', function() {
+                fetch('/api/start_measurement', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            isRunning = true;
+                            document.getElementById('startBtn').disabled = true;
+                            document.getElementById('stopBtn').disabled = false;
+                            document.getElementById('systemStatus').textContent = '测量中...';
+                            document.getElementById('systemStatus').style.color = '#f39c12';
+                        }
+                    });
+            });
+            
+            // 停止测量按钮
+            document.getElementById('stopBtn').addEventListener('click', function() {
+                fetch('/api/stop_measurement', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            isRunning = false;
+                            document.getElementById('startBtn').disabled = false;
+                            document.getElementById('stopBtn').disabled = true;
+                            document.getElementById('systemStatus').textContent = '已停止';
+                            document.getElementById('systemStatus').style.color = '#e74c3c';
+                        }
+                    });
+            });
+            
+            // 导出数据按钮
+            document.getElementById('exportBtn').addEventListener('click', function() {
+                fetch('/api/export_data')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            alert(`数据已导出到 ${data.filename}`);
+                        } else {
+                            alert(`导出失败: ${data.message}`);
+                        }
+                    });
+            });
+            
+            // 磁栅尺选择按钮
+            document.getElementById('gratingButtons').addEventListener('click', function(e) {
+                if (e.target.classList.contains('selection-btn')) {
+                    selectGrating(e.target.dataset.grating);
+                }
+            });
+            
+            // 参数设置按钮
+            document.getElementById('configBtn').addEventListener('click', function() {
+                window.open('/config', '_blank', 'width=1200,height=800');
+            });
+
+            // CPK趋势按钮
+            document.getElementById('cpkBtn').addEventListener('click', function() {
+                const cpkPanel = document.getElementById('cpkPanel');
+                const isVisible = cpkPanel.style.display !== 'none';
+
+                if (isVisible) {
+                    cpkPanel.style.display = 'none';
+                    this.textContent = 'CPK趋势';
+                } else {
+                    cpkPanel.style.display = 'block';
+                    this.textContent = '隐藏CPK';
+                    // 立即更新标签和数据
+                    const currentSide = getCurrentSide();
+                    updateCPKLabels(currentSide);
+                    updateAllCPKValues();
+                }
+            });
+
+            // 版本选择下拉框
+            document.getElementById('versionSelect').addEventListener('change', onVersionChange);
+        }
+        
+        // 磁栅尺选择
+        function selectGrating(grating) {
+            currentGrating = grating;
+            
+            console.log(`选择磁栅尺: ${grating}`);
+            
+            // 更新按钮状态
+            document.querySelectorAll('#gratingButtons .selection-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.grating === grating);
+            });
+            
+            // 重新创建图表
+            createChartsForGrating(grating);
+            
+            // 更新页面标题以反映当前选择
+            const parts = grating.split('_');
+            if (parts.length >= 4) {
+                const version = parts[0]; // G45 或 G48
+                const channelNum = parts[2]; // 1
+                const side = parts[3]; // L 或 R
+
+                // 根据通道号确定参数名
+                const channelNames = ['P1', 'P5L', 'P5U', 'P3', 'P4'];
+                const paramName = channelNames[parseInt(channelNum) - 1] || 'P1';
+
+                updateGratingTitle(`${version}-${side}-${paramName}`);
+
+                // 更新状态面板中的CPK显示
+                setTimeout(() => {
+                    updateStatusCPK();
+                }, 300);
+
+                // 如果CPK面板是打开的，更新CPK值
+                const cpkPanel = document.getElementById('cpkPanel');
+                if (cpkPanel && cpkPanel.style.display !== 'none') {
+                    setTimeout(() => {
+                        updateAllCPKValues();
+                    }, 500);
+                }
+            }
+        }
+        
+        // 为指定磁栅尺创建图表
+        async function createChartsForGrating(grating) {
+            const chartArea = document.getElementById('chartArea');
+            chartArea.innerHTML = ''; // 清空现有图表
+            charts = {}; // 重置图表对象
+            
+            const params = gratingParams[grating] || [];
+            
+            // 创建图表容器
+            for (const param of params) {
+                // 平均值图表
+                const avgContainer = document.createElement('div');
+                avgContainer.className = 'chart-container';
+                avgContainer.style.width = '48%';
+                avgContainer.style.display = 'inline-block';
+                avgContainer.style.margin = '1%';
+                
+                const avgCanvas = document.createElement('canvas');
+                avgCanvas.id = `chart_${param}_avg`;
+                avgContainer.appendChild(avgCanvas);
+                chartArea.appendChild(avgContainer);
+                
+                // 极差值图表
+                const ragContainer = document.createElement('div');
+                ragContainer.className = 'chart-container';
+                ragContainer.style.width = '48%';
+                ragContainer.style.display = 'inline-block';
+                ragContainer.style.margin = '1%';
+                
+                const ragCanvas = document.createElement('canvas');
+                ragCanvas.id = `chart_${param}_rag`;
+                ragContainer.appendChild(ragCanvas);
+                chartArea.appendChild(ragContainer);
+                
+                // 创建Chart.js图表
+                await createChart(`chart_${param}_avg`, param, '平均值');
+                await createChart(`chart_${param}_rag`, param, '极差值');
+            }
+        }
+        
+        // 创建单个图表 - 统一版本
+        async function createChart(canvasId, param, type) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+
+            // 获取配置参数
+            const config = await getChartConfig(param, type);
+
+            // 获取数据库数据
+            const chartData = await getChartDataFromDB(param, type);
+
+            // 处理数据：如果是空数组，显示空图表；如果是null，使用默认值
+            let displayData;
+            let dataSource = 'default';
+
+            if (Array.isArray(chartData)) {
+                if (chartData.length === 0) {
+                    // 数据库连接失败或无数据，显示空图表
+                    displayData = [];
+                    dataSource = 'empty';
+                } else {
+                    // 有真实数据
+                    displayData = chartData;
+                    dataSource = 'database';
+                }
+            } else {
+                // chartData为null，使用默认模拟数据
+                displayData = Array(25).fill(config.baseValue);
+                dataSource = 'simulation';
+            }
+
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 25}, (_, i) => i + 1),
+                    datasets: [{
+                        label: `${param.toUpperCase()} ${type} ${dataSource === 'empty' ? '(无数据)' : ''}`,
+                        data: displayData,
+                        borderColor: dataSource === 'empty' ? '#95a5a6' : '#2ecc71',
+                        backgroundColor: dataSource === 'empty' ? 'rgba(149, 165, 166, 0.1)' : 'rgba(46, 204, 113, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: dataSource === 'empty' ? 0 : 3,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${param.toUpperCase()} - ${type}`,
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '测量点'
+                            },
+                            min: 1,
+                            max: 25
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '测量值'
+                            },
+                            min: config.yMin,
+                            max: config.yMax
+                        }
+                    },
+                    animation: {
+                        duration: 0
+                    }
+                },
+                plugins: [{
+                    id: `referenceLines_${canvasId}`,
+                    afterDraw: function(chart) {
+                        const ctx = chart.ctx;
+                        const chartArea = chart.chartArea;
+                        const yScale = chart.scales.y;
+                        
+                        ctx.save();
+                        
+                        // 对所有图表显示参考线（平均值和极差值都显示）
+                        // 蓝色设定值线
+                        if (config.baseValue !== undefined) {
+                            const baseY = yScale.getPixelForValue(config.baseValue);
+                            ctx.strokeStyle = '#3498db';
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([5, 5]);
+                            ctx.beginPath();
+                            ctx.moveTo(chartArea.left, baseY);
+                            ctx.lineTo(chartArea.right, baseY);
+                            ctx.stroke();
+                        }
+                        
+                        // 红色上限线
+                        if (config.upperAlarm !== undefined) {
+                            const upperY = yScale.getPixelForValue(config.upperAlarm);
+                            ctx.strokeStyle = '#e74c3c';
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([]);
+                            ctx.beginPath();
+                            ctx.moveTo(chartArea.left, upperY);
+                            ctx.lineTo(chartArea.right, upperY);
+                            ctx.stroke();
+                        }
+                        
+                        // 红色下限线
+                        if (config.lowerAlarm !== undefined) {
+                            const lowerY = yScale.getPixelForValue(config.lowerAlarm);
+                            ctx.strokeStyle = '#e74c3c';
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([]);
+                            ctx.beginPath();
+                            ctx.moveTo(chartArea.left, lowerY);
+                            ctx.lineTo(chartArea.right, lowerY);
+                            ctx.stroke();
+                        }
+                        
+                        ctx.restore();
+                    }
+                }]
+            });
+            
+            charts[canvasId] = chart;
+        }
+        
+        // 获取图表配置参数
+        function getChartConfig(param, type) {
+            // 从后端API获取实际配置数据
+            // 将 G45_Channel_1_L 转换为 G45_Channel_1 (后端不区分L/R)
+            const channel = currentGrating.replace(/_[LR]$/, '');
+            return fetch(`/api/get_chart_config/${channel}/${param}/${type}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('获取图表配置失败:', data.error);
+                        // 返回默认配置
+                        return {
+                            yMin: 0, yMax: 100, baseValue: 50, upperAlarm: 80, lowerAlarm: 20
+                        };
+                    }
+                    return {
+                        yMin: data.yMin,
+                        yMax: data.yMax,
+                        baseValue: data.baseValue,
+                        upperAlarm: data.upperAlarm,
+                        lowerAlarm: data.lowerAlarm
+                    };
+                })
+                .catch(error => {
+                    console.error('获取图表配置失败:', error);
+                    // 返回默认配置
+                    return {
+                        yMin: 0, yMax: 100, baseValue: 50, upperAlarm: 80, lowerAlarm: 20
+                    };
+                });
+        }
+
+        // 请求队列管理
+        let requestQueue = [];
+        let isProcessingQueue = false;
+        const REQUEST_DELAY = 200; // 请求间隔200ms
+
+        // 从数据库获取图表数据
+        async function getChartDataFromDB(param, type) {
+            try {
+                // 检查数据源开关，如果设置为使用模拟值，直接返回null
+                if (!useRealData) {
+                    console.log(`数据源设置为模拟值，跳过数据库查询: ${param}-${type}`);
+                    return null;
+                }
+
+                // 解析当前选择的磁栅尺信息
+                const parts = currentGrating.split('_');
+                if (parts.length >= 4) {
+                    const version = parts[0]; // G45 或 G48
+                    const channel = parts[2]; // 1, 2, 3, 4, 5
+                    const side = parts[3]; // L 或 R
+
+                    // 将前端的type转换为后端的chart_type
+                    const chart_type = type === '平均值' ? 'avg' : 'rag';
+
+                    // 添加到请求队列而不是立即发送
+                    return await queuedFetch(`/api/get_chart_data/${version}/${channel}/${param}/${chart_type}/${side}`, param, type);
+                }
+
+                return null; // 返回null表示使用默认数据
+            } catch (error) {
+                console.error('获取数据库图表数据失败:', error);
+                return null;
+            }
+        }
+
+        // 队列化的fetch请求
+        async function queuedFetch(url, param, type) {
+            return new Promise((resolve) => {
+                requestQueue.push({
+                    url,
+                    param,
+                    type,
+                    resolve
+                });
+
+                processRequestQueue();
+            });
+        }
+
+        // 处理请求队列
+        async function processRequestQueue() {
+            if (isProcessingQueue || requestQueue.length === 0) {
+                return;
+            }
+
+            isProcessingQueue = true;
+
+            while (requestQueue.length > 0) {
+                const request = requestQueue.shift();
+
+                try {
+                    const response = await fetch(request.url);
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        if (data.data && data.data.length > 0) {
+                            console.log(`从${data.source}获取到${request.param}-${request.type}图表数据:`, data.data.length, '个数据点');
+
+                            // 特别记录P3LT参数的数据
+                            if (request.param.toLowerCase() === 'p3lt') {
+                                console.log(`🎯 P3LT数据详情:`, {
+                                    param: request.param,
+                                    type: request.type,
+                                    dataLength: data.data.length,
+                                    firstThreePoints: data.data.slice(0, 3),
+                                    source: data.source
+                                });
+                            }
+
+                            request.resolve(data.data.map(point => point.y));
+                        } else {
+                            // 数据为空的情况
+                            console.log(`${request.param}-${request.type}: 数据库连接失败或无数据，图表将显示为空`);
+
+                            // 特别记录P3LT参数的空数据情况
+                            if (request.param.toLowerCase() === 'p3lt') {
+                                console.log(`🎯 P3LT数据为空:`, {
+                                    param: request.param,
+                                    type: request.type,
+                                    response: data
+                                });
+                            }
+
+                            request.resolve([]); // 返回空数组而不是null
+                        }
+                    } else if (data.status === 'error') {
+                        console.error('获取图表数据失败:', data.message);
+
+                        // 特别记录P3LT参数的错误情况
+                        if (request.param.toLowerCase() === 'p3lt') {
+                            console.error(`🎯 P3LT数据获取错误:`, {
+                                param: request.param,
+                                type: request.type,
+                                error: data.message
+                            });
+                        }
+
+                        request.resolve([]); // 返回空数组而不是null
+                    } else {
+                        request.resolve([]);
+                    }
+                } catch (error) {
+                    console.error('请求失败:', error);
+                    request.resolve(null);
+                }
+
+                // 添加延迟，避免过于频繁的请求
+                if (requestQueue.length > 0) {
+                    await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY));
+                }
+            }
+
+            isProcessingQueue = false;
+        }
+        
+        
+        
+        // 添加参考线
+        function addReferenceLines(chart, config) {
+            // 注册插件来绘制参考线
+            Chart.register({
+                id: 'referenceLines',
+                afterDraw: function(chart) {
+                    if (currentGrating.includes('Channel') && chart.canvas.id.includes('avg')) {
+                        const ctx = chart.ctx;
+                        const chartArea = chart.chartArea;
+                        const yScale = chart.scales.y;
+                        
+                        ctx.save();
+                        
+                        // 蓝色设定值线
+                        const baseY = yScale.getPixelForValue(config.baseValue);
+                        ctx.strokeStyle = '#3498db';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([5, 5]);
+                        ctx.beginPath();
+                        ctx.moveTo(chartArea.left, baseY);
+                        ctx.lineTo(chartArea.right, baseY);
+                        ctx.stroke();
+                        
+                        // 红色上限线
+                        const upperY = yScale.getPixelForValue(config.upperAlarm);
+                        ctx.strokeStyle = '#e74c3c';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([]);
+                        ctx.beginPath();
+                        ctx.moveTo(chartArea.left, upperY);
+                        ctx.lineTo(chartArea.right, upperY);
+                        ctx.stroke();
+                        
+                        // 红色下限线
+                        const lowerY = yScale.getPixelForValue(config.lowerAlarm);
+                        ctx.strokeStyle = '#e74c3c';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([]);
+                        ctx.beginPath();
+                        ctx.moveTo(chartArea.left, lowerY);
+                        ctx.lineTo(chartArea.right, lowerY);
+                        ctx.stroke();
+                        
+                        ctx.restore();
+                    }
+                }
+            });
+        }
+        
+        // 更新图表数据
+        function updateChart() {
+            fetch(`/api/get_data/${currentChannel}/${currentParameter}/${currentView}`)
+                .then(response => response.json())
+                .then(data => {
+                    // 确保有50个数据点
+                    const chartData = Array(50).fill(0);
+                    data.forEach((point, index) => {
+                        if (index < 50) {
+                            chartData[index] = point.y;
+                        }
+                    });
+                    
+                    chart.data.datasets[0].data = chartData;
+                    chart.update('none');
+                });
+        }
+        
+        // 更新图表标题
+        function updateChartTitle() {
+            const title = `通道${currentChannel} - ${currentParameter} - ${currentView === 'avg' ? '平均值' : '极差值'}`;
+            chart.options.plugins.title.text = title;
+            chart.update('none');
+        }
+        
+        // 更新Y轴范围 - 与原程序规格一致
+        function updateYAxisRange() {
+            let yMin, yMax;
+            
+            if (currentView === 'avg') {
+                const ranges = {
+                    'P1': [218.5, 221.5],
+                    'P5U': [423.0, 427.0],
+                    'P5L': [423.0, 427.0],
+                    'P3': [642.0, 648.0],
+                    'P4': [0.0, 2.0]
+                };
+                [yMin, yMax] = ranges[currentParameter] || [0, 100];
+            } else {
+                [yMin, yMax] = [0, 1.0];
+            }
+            
+            chart.options.scales.y.min = yMin;
+            chart.options.scales.y.max = yMax;
+            chart.update('none');
+        }
+        
+        // 更新状态显示
+        function updateStatusDisplay(data) {
+            const valueMap = {
+                'P1': { avg: data.p1_avg, cpk: data.cpk_p1 },
+                'P5U': { avg: data.p5u_avg, cpk: data.cpk_p5u },
+                'P5L': { avg: data.p5l_avg, cpk: data.cpk_p5l },
+                'P3': { avg: data.p3_avg, cpk: data.cpk_p3 },
+                'P4': { avg: data.p4_avg, cpk: data.cpk_p4 }
+            };
+            
+            if (currentParameter in valueMap) {
+                const { avg, cpk } = valueMap[currentParameter];
+                document.getElementById('cpkDisplay').textContent = `CPK: ${cpk.toFixed(2)}`;
+                document.getElementById('currentValue').textContent = `当前值: ${avg.toFixed(2)}`;
+                
+                // 更新规格限显示
+                const limits = getSpecLimits(currentParameter);
+                document.getElementById('specLimits').textContent = `规格限: ${limits.lsl} ~ ${limits.usl}`;
+
+                // 更新CPK颜色
+                const cpkElement = document.getElementById('cpkDisplay');
+                if (cpk >= 1.33) {
+                    cpkElement.style.color = '#27ae60';
+                } else if (cpk >= 1.0) {
+                    cpkElement.style.color = '#f39c12';
+                } else {
+                    cpkElement.style.color = '#e74c3c';
+                }
+            }
+
+            // 更新CPK面板中的所有值
+            updateCPKPanel(data);
+        }
+
+        // 更新CPK面板
+        function updateCPKPanel(data) {
+            const cpkData = {
+                'P1': data.cpk_p1,
+                'P5U': data.cpk_p5u,
+                'P5L': data.cpk_p5l,
+                'P3': data.cpk_p3,
+                'P4': data.cpk_p4
+            };
+
+            Object.keys(cpkData).forEach(param => {
+                const cpk = cpkData[param];
+                const valueElement = document.getElementById(`cpk${param}`);
+                const statusElement = document.getElementById(`status${param}`);
+
+                if (valueElement && statusElement) {
+                    valueElement.textContent = cpk.toFixed(3);
+
+                    // 设置CPK值颜色和状态
+                    const { colorClass, statusText, statusClass } = getCPKStatus(cpk);
+                    valueElement.className = `cpk-value ${colorClass}`;
+                    statusElement.textContent = statusText;
+                    statusElement.className = `cpk-status ${statusClass}`;
+                }
+            });
+        }
+
+        // 获取CPK状态
+        function getCPKStatus(cpk) {
+            if (cpk >= 1.33) {
+                return {
+                    colorClass: 'cpk-excellent',
+                    statusText: '优秀',
+                    statusClass: 'status-excellent'
+                };
+            } else if (cpk >= 1.0) {
+                return {
+                    colorClass: 'cpk-good',
+                    statusText: '良好',
+                    statusClass: 'status-good'
+                };
+            } else {
+                return {
+                    colorClass: 'cpk-poor',
+                    statusText: '需改进',
+                    statusClass: 'status-poor'
+                };
+            }
+        }
+
+        // 更新所有CPK值（当打开CPK面板时调用）
+        function updateAllCPKValues() {
+            const currentSide = getCurrentSide();
+            const currentVersion = getCurrentVersion();
+
+            console.log(`更新所有CPK值: 版本=${currentVersion}, 侧面=${currentSide}`);
+
+            // 更新CPK面板的侧面指示器和标签
+            updateCPKLabels(currentSide);
+
+            // 需要获取所有5个通道的CPK数据
+            const channels = [1, 2, 3, 4, 5]; // P1, P5L, P5U, P3, P4
+            const cpkPromises = channels.map(channel =>
+                fetch(`/api/get_cpk_data/${currentVersion}/${channel}/${currentSide}`)
+                    .then(response => response.json())
+                    .then(data => ({ channel, data }))
+                    .catch(error => {
+                        console.error(`获取通道${channel}的CPK数据失败:`, error);
+                        return { channel, data: { error: error.message } };
+                    })
+            );
+
+            // 等待所有请求完成
+            Promise.all(cpkPromises)
+                .then(results => {
+                    // 合并所有通道的CPK数据
+                    const allCpkData = {
+                        cpk_p1: 0,
+                        cpk_p5l: 0,
+                        cpk_p5u: 0,
+                        cpk_p3: 0,
+                        cpk_p4: 0
+                    };
+
+                    results.forEach(result => {
+                        const { channel, data } = result;
+                        if (!data.error) {
+                            // 根据通道号映射到对应的CPK字段
+                            if (channel === 1) allCpkData.cpk_p1 = data.cpk_p1 || 0;
+                            else if (channel === 2) allCpkData.cpk_p5l = data.cpk_p5l || 0;
+                            else if (channel === 3) allCpkData.cpk_p5u = data.cpk_p5u || 0;
+                            else if (channel === 4) allCpkData.cpk_p3 = data.cpk_p3 || 0;
+                            else if (channel === 5) allCpkData.cpk_p4 = data.cpk_p4 || 0;
+                        } else {
+                            console.warn(`通道${channel}的CPK数据获取失败，使用默认值`);
+                            // 使用版本相关的模拟数据
+                            const defaultValues = getDefaultCPKValues(currentVersion);
+                            if (channel === 1) allCpkData.cpk_p1 = defaultValues.cpk_p1;
+                            else if (channel === 2) allCpkData.cpk_p5l = defaultValues.cpk_p5l;
+                            else if (channel === 3) allCpkData.cpk_p5u = defaultValues.cpk_p5u;
+                            else if (channel === 4) allCpkData.cpk_p3 = defaultValues.cpk_p3;
+                            else if (channel === 5) allCpkData.cpk_p4 = defaultValues.cpk_p4;
+                        }
+                    });
+
+                    console.log('合并后的CPK数据:', allCpkData);
+                    updateCPKPanel(allCpkData);
+                })
+                .catch(error => {
+                    console.error('获取CPK数据失败:', error);
+                    // 使用版本相关的默认数据
+                    const defaultData = getDefaultCPKValues(currentVersion);
+                    updateCPKPanel(defaultData);
+                });
+        }
+
+        // 更新CPK面板的标签显示
+        function updateCPKLabels(currentSide) {
+            // 更新侧面指示器
+            const sideIndicator = document.getElementById('cpkSideIndicator');
+            if (sideIndicator) {
+                sideIndicator.textContent = `${currentSide}侧`;
+            }
+
+            // 更新所有参数标签
+            const paramLabels = ['P1', 'P5U', 'P5L', 'P3', 'P4'];
+            paramLabels.forEach(param => {
+                const labelElement = document.getElementById(`label${param}`);
+                if (labelElement) {
+                    labelElement.textContent = `${currentSide}-${param}`;
+                }
+            });
+
+            console.log(`CPK标签已更新为 ${currentSide} 侧`);
+        }
+
+        // 获取版本相关的默认CPK值
+        function getDefaultCPKValues(version) {
+            if (version === 'G45') {
+                return {
+                    cpk_p1: 4.18,
+                    cpk_p5l: 3.72,
+                    cpk_p5u: 2.85,
+                    cpk_p3: 1.95,
+                    cpk_p4: 2.67
+                };
+            } else { // G48
+                return {
+                    cpk_p1: 2.50,
+                    cpk_p5l: 1.88,
+                    cpk_p5u: 2.15,
+                    cpk_p3: 1.45,
+                    cpk_p4: 1.92
+                };
+            }
+        }
+
+        // 获取当前通道
+        function getCurrentChannel() {
+            const activeBtn = document.querySelector('.selection-btn.active');
+            if (activeBtn) {
+                const text = activeBtn.textContent;
+                if (text.includes('P1')) return 1;
+                if (text.includes('P5L')) return 2;
+                if (text.includes('P5U')) return 3;
+                if (text.includes('P3')) return 4;
+                if (text.includes('P4')) return 5;
+            }
+            return 1; // 默认通道1
+        }
+
+        // 获取当前侧面
+        function getCurrentSide() {
+            const activeBtn = document.querySelector('.selection-btn.active');
+            if (activeBtn) {
+                const text = activeBtn.textContent;
+                if (text.includes('-L-')) return 'L';
+                if (text.includes('-R-')) return 'R';
+            }
+            return 'L'; // 默认左侧
+        }
+
+        // 获取当前版本
+        function getCurrentVersion() {
+            const activeBtn = document.querySelector('.selection-btn.active');
+            if (activeBtn) {
+                const text = activeBtn.textContent;
+                if (text.startsWith('G45')) return 'G45';
+                if (text.startsWith('G48')) return 'G48';
+            }
+            return 'G45'; // 默认G45
+        }
+
+        // 更新状态面板中的CPK显示
+        function updateStatusCPK() {
+            const currentChannel = getCurrentChannel();
+            const currentSide = getCurrentSide();
+            const currentVersion = getCurrentVersion();
+
+            // 发送请求获取当前参数的CPK数据
+            fetch(`/api/get_cpk_data/${currentVersion}/${currentChannel}/${currentSide}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.error) {
+                        // 根据当前通道更新对应的CPK显示
+                        let cpkValue = 0;
+                        if (currentChannel === 1) cpkValue = data.cpk_p1;
+                        else if (currentChannel === 2) cpkValue = data.cpk_p5l;
+                        else if (currentChannel === 3) cpkValue = data.cpk_p5u;
+                        else if (currentChannel === 4) cpkValue = data.cpk_p3;
+                        else if (currentChannel === 5) cpkValue = data.cpk_p4;
+
+                        // 更新CPK显示
+                        const cpkElement = document.getElementById('cpkDisplay');
+                        cpkElement.textContent = `CPK: ${cpkValue.toFixed(2)}`;
+
+                        // 更新CPK颜色
+                        if (cpkValue >= 1.33) {
+                            cpkElement.style.color = '#27ae60';
+                        } else if (cpkValue >= 1.0) {
+                            cpkElement.style.color = '#f39c12';
+                        } else {
+                            cpkElement.style.color = '#e74c3c';
+                        }
+
+                        console.log(`状态面板CPK已更新: ${cpkValue.toFixed(2)} (版本: ${currentVersion}, 通道: ${currentChannel})`);
+                    }
+                })
+                .catch(error => {
+                    console.error('更新状态CPK失败:', error);
+                });
+        }
+        
+        // 获取规格限 - 与原程序配置一致
+        function getSpecLimits(parameter) {
+            const limits = {
+                'P1': { lsl: 219.10, usl: 220.90 },
+                'P5U': { lsl: 423.0, usl: 427.0 },
+                'P5L': { lsl: 423.0, usl: 427.0 },
+                'P3': { lsl: 643.0, usl: 647.0 },
+                'P4': { lsl: 0.0, usl: 2.0 }
+            };
+            return limits[parameter] || { lsl: 0, usl: 100 };
+        }
+        
+        // 显示报警
+        function showAlarm(message) {
+            const alarmArea = document.getElementById('alarmArea');
+            const alarmDiv = document.createElement('div');
+            alarmDiv.className = 'alarm-message';
+            alarmDiv.textContent = message;
+            
+            alarmArea.appendChild(alarmDiv);
+            
+            // 5秒后自动移除报警
+            setTimeout(() => {
+                if (alarmDiv.parentNode) {
+                    alarmDiv.parentNode.removeChild(alarmDiv);
+                }
+            }, 5000);
+        }
+        
+        // 更新时间显示
+        function updateTimeDisplay() {
+            const now = new Date();
+            const timeString = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('timeDisplay').textContent = timeString;
+        }
+        
+        // 更新状态文本
+        function updateStatusText(text) {
+            document.getElementById('statusText').textContent = text;
+        }
+
+        // 更新页面标题 (版本切换时使用)
+        function updatePageTitle(version) {
+            // 更新浏览器标题
+            document.title = `${version}-L-P1X光栅测量系统 - Web版`;
+
+            // 更新左上角的标题文本
+            const titleElement = document.querySelector('.title-text');
+            if (titleElement) {
+                titleElement.textContent = `${version}-L-P1X光栅测量系统 - Web版`;
+            }
+        }
+
+        // 更新磁栅尺选择标题 (磁栅尺选择时使用)
+        function updateGratingTitle(gratingName) {
+            // 更新浏览器标题
+            document.title = `${gratingName}光栅测量系统 - Web版`;
+
+            // 更新左上角的标题文本
+            const titleElement = document.querySelector('.title-text');
+            if (titleElement) {
+                titleElement.textContent = `${gratingName}光栅测量系统 - Web版`;
+            }
+        }
+
+        // 数据源控制
+        let useRealData = true; // 默认使用实际数据
+
+        // 监听来自配置页面的消息
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'dataSourceChanged') {
+                useRealData = event.data.useRealData;
+                console.log('数据源已切换:', useRealData ? '实际值' : '模拟值');
+
+                // 更新状态显示
+                updateDataSourceStatus();
+
+                // 刷新当前图表
+                refreshCurrentChart();
+            }
+        });
+
+        // 更新数据源状态显示
+        function updateDataSourceStatus() {
+            const statusElement = document.getElementById('statusText');
+            if (statusElement) {
+                const currentStatus = statusElement.textContent;
+                const dataSourceText = useRealData ? '实际值' : '模拟值';
+
+                // 如果状态文本中没有数据源信息，添加它
+                if (!currentStatus.includes('数据源:')) {
+                    statusElement.textContent = `${currentStatus} | 数据源: ${dataSourceText}`;
+                } else {
+                    // 更新现有的数据源信息
+                    statusElement.textContent = currentStatus.replace(/数据源: (实际值|模拟值)/, `数据源: ${dataSourceText}`);
+                }
+            }
+        }
+
+        // 刷新当前图表
+        function refreshCurrentChart() {
+            // 重新加载所有图表数据
+            loadAllCharts();
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
